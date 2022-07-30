@@ -6,10 +6,12 @@
   "author": "Michal Marek <michal@marek.pw>",
   "license": "MIT",
   "dependencies": {
+    "@octokit/rest": "^19.0.3",
     "date-fns": "^2.29.1",
     "ethers": "^5.6.9",
     "lodash.groupby": "^4.6.0",
-    "node-fetch": "^2.6.7"
+    "node-fetch": "^2.6.7",
+    "octokit-commit-multiple-files": "^4.1.0"
   },
   "devDependencies": {
     "dotenv": "^16.0.1"

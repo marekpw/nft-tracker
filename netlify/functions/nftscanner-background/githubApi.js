@@ -1,6 +1,12 @@
+let { Octokit } = require('@octokit/rest');
 const fetch = require('node-fetch');
+Octokit = Octokit.plugin(require('octokit-commit-multiple-files'));
 
 const GITHUB_API_KEY = process.env.GITHUB_API_KEY;
+
+const octokit = new Octokit({
+  auth: GITHUB_API_KEY,
+})
 
 /**
  * 
@@ -8,14 +14,13 @@ const GITHUB_API_KEY = process.env.GITHUB_API_KEY;
  * @returns {Promise<{ sha: string, content: string }>}
  */
 const getFile = async (filePath) => {
-  const file = await fetch(`https://api.github.com/repos/marekpw/nft-tracker/contents/${filePath}`, {
-    method: 'GET',
-    headers: {
-      Authorization: `token ${GITHUB_API_KEY}`,
-    },
+  const { data: result } = await octokit.request(`GET /repos/{owner}/{repo}/contents/{path}`, {
+    owner: 'marekpw',
+    repo: 'nft-tracker',
+    path: filePath,
+    branch: 'test-multi-file-commits'
   });
 
-  const result = await file.json();
   if (result.content) {
     return {
       ...result,
@@ -67,7 +72,22 @@ const updateFile = async (filePath, sha, fileContent) => {
   return await response.json();
 };
 
+const updateMultipleFiles = async files => {
+  return await octokit.rest.repos.createOrUpdateFiles({
+    owner: 'marekpw',
+    repo: 'nft-tracker',
+    branch: 'test-multi-file-commits',
+    changes: [
+      {
+        message: 'netlify bot: update files',
+        files
+      }
+    ]
+  });
+};
+
 module.exports = {
   getFile,
   updateFile,
+  updateMultipleFiles,
 };
