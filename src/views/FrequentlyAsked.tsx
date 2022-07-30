@@ -42,7 +42,7 @@ export const FrequentlyAsked = () => {
         However, for convenience, I have added an experimental feature to point NFT links to the Gamestop Marketplace instead. Just enable it in the <Link component={RouterLink} to='/settings'>Settings</Link>.
       </FaqSection>
       <FaqSection title="Is this project open source?">
-        LoopNFT is available on GitHub: <Link href='https://github.com/marekpw/nft-tracker'>marekpw/nft-tracker</Link>
+        LoopNFT is available on GitHub: <Link href='https://github.com/marekpw/nft-tracker' target='_blank'>marekpw/nft-tracker</Link>
       </FaqSection>
       <FaqSection title="Is there any way I can help?">
         This application takes effort to develop and is not free to run. The money needed to run it is paid out of my own pocket. If you think this application has helped you and you wish to support me and future development,
