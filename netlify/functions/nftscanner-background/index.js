@@ -8,7 +8,7 @@ const { getNftMetadata } = require('./nftMetadata');
 const { getFile, updateMultipleFiles } = require('./githubApi');
 const { getTransactions } = require('./theGraphApi');
 
-const WEEK_THRESHOLD = Date.now() - 3600 * 24 * 1 * 1000;
+const WEEK_THRESHOLD = Date.now() - 3600 * 24 * 7 * 1000;
 const DAY_THRESHOLD = Date.now() - 3600 * 24 * 1000;
 
 const FILENAMES = {
@@ -347,20 +347,21 @@ exports.handler = async () => {
 
   console.log('[INFO] Scan completed. Writing to GitHub...');
 
-  await updateMultipleFiles({
-    [FILENAMES.daily]: JSON.stringify(daily),
-    [FILENAMES.weekly]: JSON.stringify(weekly),
-    [FILENAMES.transactions]: JSON.stringify(lastTransactions),
-    [FILENAMES.nfts]: JSON.stringify(nfts),
-    [FILENAMES.metadata]: JSON.stringify({
-      updatedAt: Date.now(),
-      lastTransaction: transactionsToResample[0].ts,
-      volume: dailyVolume,
-      trades: dailyTrades,
-    }),
-  });
-
-  console.log('[INFO] Writing files to GitHub completed. Scan finished successfully.');
+  try {
+    await updateMultipleFiles({
+      [FILENAMES.daily]: JSON.stringify(daily),
+      [FILENAMES.weekly]: JSON.stringify(weekly),
+      [FILENAMES.transactions]: JSON.stringify(lastTransactions),
+      [FILENAMES.nfts]: JSON.stringify(nfts),
+      [FILENAMES.metadata]: JSON.stringify({
+        updatedAt: Date.now(),
+        lastTransaction: transactionsToResample[0].ts,
+        volume: dailyVolume,
+        trades: dailyTrades,
+      }),
+    });
+    console.log('[INFO] Writing files to GitHub completed. Scan finished successfully.');
+  } catch (error) {
+    console.error(`[CRITICAL] Failed to write to GitHub. Changes will not be reflected. Error: ${error}`);
+  }
 };
-
-exports.handler();
