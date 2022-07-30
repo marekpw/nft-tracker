@@ -6,7 +6,7 @@ const GITHUB_API_KEY = process.env.GITHUB_API_KEY;
 
 const octokit = new Octokit({
   auth: GITHUB_API_KEY,
-})
+});
 
 /**
  * 
@@ -14,11 +14,11 @@ const octokit = new Octokit({
  * @returns {Promise<{ sha: string, content: string }>}
  */
 const getFile = async (filePath) => {
-  const { data: result } = await octokit.request(`GET /repos/{owner}/{repo}/contents/{path}`, {
+  const { data: result } = await octokit.rest.repos.getContent({
     owner: 'marekpw',
     repo: 'nft-tracker',
     path: filePath,
-    branch: 'test-multi-file-commits'
+    ref: 'test-multi-file-commits',
   });
 
   if (result.content) {
@@ -45,33 +45,6 @@ const getFile = async (filePath) => {
   }
 };
 
-/**
- * 
- * @param {string} filePath Path to the file in the repository.
- * @param {string} sha SHA of the blob
- * @param {string} fileContent Contents of the file, without base64. Will be encoded automatically.
- * @returns {Promise<void>}
- */
-const updateFile = async (filePath, sha, fileContent) => {
-  const response = await fetch(`https://api.github.com/repos/marekpw/nft-tracker/contents/${filePath}`, {
-    method: 'PUT',
-    headers: {
-      Authorization: `token ${GITHUB_API_KEY}`,
-    },
-    body: JSON.stringify({
-      message: `netlify bot: update ${filePath}`,
-      committer: {
-        name: 'Netlify Bot',
-        email: 'michal@marek.pw'
-      },
-      content: Buffer.from(fileContent).toString('base64'),
-      sha,
-    }),
-  });
-
-  return await response.json();
-};
-
 const updateMultipleFiles = async files => {
   return await octokit.rest.repos.createOrUpdateFiles({
     owner: 'marekpw',
@@ -88,6 +61,5 @@ const updateMultipleFiles = async files => {
 
 module.exports = {
   getFile,
-  updateFile,
   updateMultipleFiles,
 };

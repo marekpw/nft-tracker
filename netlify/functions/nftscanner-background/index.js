@@ -5,11 +5,10 @@ const { eachMinuteOfInterval, getTime } = require('date-fns');
 const groupBy = require('lodash.groupby');
 
 const { getNftMetadata } = require('./nftMetadata');
-const { getFile, updateFile, updateMultipleFiles } = require('./githubApi');
+const { getFile, updateMultipleFiles } = require('./githubApi');
 const { getTransactions } = require('./theGraphApi');
-const { json } = require('stream/consumers');
 
-const WEEK_THRESHOLD = Date.now() - 3600 * 24 * 7 * 1000;
+const WEEK_THRESHOLD = Date.now() - 3600 * 24 * 1 * 1000;
 const DAY_THRESHOLD = Date.now() - 3600 * 24 * 1000;
 
 const FILENAMES = {
@@ -162,12 +161,11 @@ const resampleTransactions = (transactions, existingValues, options) => {
  * #########################
  */
 exports.handler = async () => {
-  const [lastTransactionsFile, weeklyFile, dailyFile, nftsFile, metadataFile] = await Promise.all([
+  const [lastTransactionsFile, weeklyFile, dailyFile, nftsFile] = await Promise.all([
     getFile(FILENAMES.transactions),
     getFile(FILENAMES.weekly),
     getFile(FILENAMES.daily),
     getFile(FILENAMES.nfts),
-    getFile(FILENAMES.metadata),
   ]);
 
   let lastTransactions = JSON.parse(lastTransactionsFile.content);
@@ -351,7 +349,7 @@ exports.handler = async () => {
 
   await updateMultipleFiles({
     [FILENAMES.daily]: JSON.stringify(daily),
-    [FILENAMES.weekly]: json.stringify(weekly),
+    [FILENAMES.weekly]: JSON.stringify(weekly),
     [FILENAMES.transactions]: JSON.stringify(lastTransactions),
     [FILENAMES.nfts]: JSON.stringify(nfts),
     [FILENAMES.metadata]: JSON.stringify({
