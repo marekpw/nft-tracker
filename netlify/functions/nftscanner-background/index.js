@@ -8,11 +8,13 @@ const { getNftMetadata } = require('./nftMetadata');
 const { getFile, updateMultipleFiles } = require('./githubApi');
 const { getTransactions } = require('./theGraphApi');
 
+const MONTH_THRESHOLD = Date.now() - 3600 * 24 * 30 * 1000;
 const WEEK_THRESHOLD = Date.now() - 3600 * 24 * 7 * 1000;
 const DAY_THRESHOLD = Date.now() - 3600 * 24 * 1000;
 
 const FILENAMES = {
   transactions: 'src/data/transactions.json',
+  monthly: 'src/data/monthly.json',
   weekly: 'src/data/weekly.json',
   daily: 'src/data/daily.json',
   nfts: 'src/data/nfts.json',
@@ -24,6 +26,14 @@ const LAST_TRANSACTIONS_LIMIT = 1000;
 
 const parseTransaction = input => {
   const priceCoeff = Math.pow(10, input.token.decimals);
+  const price = parseInt(input.realizedNFTPrice) / priceCoeff;
+  const networkFee = parseInt(input.feeBuyer) / priceCoeff;
+  const royaltiesPercentage = input.nfts[0].creatorFeeBips;
+  const royalties = royaltiesPercentage > 0 ? (price / royaltiesPercentage) : 0;
+  const sellerFeeTotal = input.feeBipsB / 100;
+  const marketplaceFeePercentage = sellerFeeTotal - royaltiesPercentage;
+  const marketplaceFee = marketplaceFeePercentage > 0 ? (price / marketplaceFeePercentage) : 0;
+
   return {
     id: input.id,
     iid: input.internalID,
@@ -32,36 +42,41 @@ const parseTransaction = input => {
     buyer: input.accountBuyer.address,
     seller: input.accountSeller.address,
     ts: input.block.timestamp * 1000, // multiply by 1000 to work with JS millisecond timestamps
-    price: parseInt(input.realizedNFTPrice) / priceCoeff,
     symbol: input.token.symbol,
-    fee: (parseInt(input.feeBuyer) / priceCoeff) + (parseInt(input.feeSeller) / priceCoeff),
     token: input.nfts[0].token,
-    
+    networkFee,
+    royalties,
+    price,
+    marketplaceFee,
+    isGamestop: marketplaceFeePercentage.toFixed(2) === '2.25',
   };
 };
 
 const bucketMerger = (current, old) => {
   const sum = current.reduce((a, b) => a + b.price, 0);
-  const fees = current.reduce((a, b) => a + b.fee, 0);
+  const networkFeeSum = current.reduce((a, b) => a + b.networkFee, 0);
+  const marketplaceFeeSum = current.reduce((a, b) => a + b.marketplaceFee, 0);
+  const royaltiesSum = current.reduce((a, b) => a + b.royalties, 0);
   const newData = [
     current.length,
     sum / current.length,
     sum,
-    fees,
+    networkFeeSum,
+    marketplaceFeeSum,
+    royaltiesSum
   ];
 
   if (!old) {
     return newData;
   }
 
-  const [oldTrades, _, oldSum, oldFees] = old;
-  const [newTrades, __, newSum, newFees] = newData;
-
   return [
-    oldTrades + newTrades,
-    oldSum / oldTrades + newSum / newTrades,
-    oldSum + newSum,
-    oldFees + newFees,
+    old[0] + newData[0],                        // trades
+    old[2] / old[0] + newData[2] / newData[0],  // average price
+    old[2] + newData[2],                        // sum
+    old[3] + newData[3],                        // network fees sum
+    old[4] + newData[4],                        // marketplace fees sum
+    old[5] + newData[5],                        // royalties sum
   ];
 };
 
@@ -161,17 +176,19 @@ const resampleTransactions = (transactions, existingValues, options) => {
  * #########################
  */
 exports.handler = async () => {
-  const [lastTransactionsFile, weeklyFile, dailyFile, nftsFile] = await Promise.all([
+  const [lastTransactionsFile, monthlyFile, weeklyFile, dailyFile, nftsFile] = await Promise.all([
     getFile(FILENAMES.transactions),
+    getFile(FILENAMES.monthly),
     getFile(FILENAMES.weekly),
     getFile(FILENAMES.daily),
     getFile(FILENAMES.nfts),
   ]);
 
   let lastTransactions = JSON.parse(lastTransactionsFile.content);
-  let weekly = JSON.parse(weeklyFile.content);
-  let daily = JSON.parse(dailyFile.content);
-  let nfts = JSON.parse(nftsFile.content);
+  const monthly = JSON.parse(monthlyFile.content);
+  const weekly = JSON.parse(weeklyFile.content);
+  const daily = JSON.parse(dailyFile.content);
+  const nfts = JSON.parse(nftsFile.content);
 
   const lastRecordedTransactionId = weekly.lastTransaction;
 
@@ -269,6 +286,18 @@ exports.handler = async () => {
     idProperty: 'token'
   });
 
+  const { samples: monthlySamples, data: monthlyNftBuckets } = resampleTransactions(transactionsToResample, monthly.nfts, {
+    threshold: MONTH_THRESHOLD,
+    minutes: 60 * 6, // 6 hour intervals,
+    idProperty: 'nftId'
+  });
+
+  const { data: monthlyTokenBuckets } = resampleTransactions(transactionsToResample, monthly.tokens, {
+    threshold: MONTH_THRESHOLD,
+    minutes: 60 * 6, // 6 hour intervals,
+    idProperty: 'token'
+  });
+
   console.log(`[INFO] All transactions parsed.`);
 
   daily.labels = dailySamples;
@@ -280,6 +309,11 @@ exports.handler = async () => {
   weekly.nfts = weeklyNftBuckets;
   weekly.tokens = weeklyTokenBuckets;
   weekly.lastTransaction = transactionsToResample[0].iid;
+
+  monthly.labels = monthlySamples;
+  monthly.nfts = monthlyNftBuckets;
+  monthly.tokens = monthlyTokenBuckets;
+  monthly.lastTransaction = transactionsToResample[0].iid;
 
   let dailyVolume = 0;
   let dailyTrades = 0;
@@ -299,13 +333,25 @@ exports.handler = async () => {
       return true;
     }
 
-    const buckets = weeklyNftBuckets[key];
-    const trades = bucketValues(buckets).reduce((acc, current) => {
+    const monthlyBuckets = monthlyNftBuckets[key];
+    const monthlyTrades = bucketValues(monthlyBuckets).reduce((acc, current) => {
       // 0 is the trade count
       return acc + current[0];
     }, 0);
 
-    return trades >= 3;
+    if (monthlyTrades >= 10) {
+      // if there have been at least 10 trades for the NFT in the last month, keep it
+      return true;
+    }
+
+    const weeklyBuckets = weeklyNftBuckets[key];
+    const weeklyTrades = bucketValues(weeklyBuckets).reduce((acc, current) => {
+      // 0 is the trade count
+      return acc + current[0];
+    }, 0);
+
+    // otherwise, at least 3 weekly trades per NFT get a pass
+    return weeklyTrades >= 3;
   });
 
   const newNfts = Object.keys(weekly.nfts);
@@ -350,6 +396,7 @@ exports.handler = async () => {
   try {
     await updateMultipleFiles({
       [FILENAMES.daily]: JSON.stringify(daily),
+      [FILENAMES.monthly]: JSON.stringify(monthly),
       [FILENAMES.weekly]: JSON.stringify(weekly),
       [FILENAMES.transactions]: JSON.stringify(lastTransactions),
       [FILENAMES.nfts]: JSON.stringify(nfts),
