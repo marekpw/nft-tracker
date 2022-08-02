@@ -391,5 +391,3 @@ exports.handler = async () => {
     console.error(`[CRITICAL] Failed to write to GitHub. Changes will not be reflected. Error: ${error}`);
   }
 };
-
-exports.handler();
