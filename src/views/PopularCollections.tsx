@@ -10,9 +10,9 @@ import { ChartDataset, TableOptionsMenu } from '../components/Table/TableOptions
 export const DEFAULT_TIME = 3600 * 1000 * 24;
 
 export const PopularCollections = () => {
-  const [dataset, setDataset] = useLocalStorage<ChartDataset>('popular_collection_dataset', 'volume');
+  const [dataset, setDataset] = useLocalStorage<ChartDataset>('popular_collection_dataset_v1.1', 'avgPrice');
   const [minTrades, setMinTrades] = useLocalStorage<number>('popular_collection_mintrades', 3);
-  const [timeRange, setTimeRange] = useLocalStorage('popular_collection_timerange', DEFAULT_TIME);
+  const [timeRange, setTimeRange] = useLocalStorage('popular_collection_timerange_v1.1', DEFAULT_TIME);
   const { show: showFtue, acknowledge } = useFtue('gamestop_collections');
   return (
     <ContentWrapper column>
@@ -22,8 +22,8 @@ export const PopularCollections = () => {
         <TimeFilterMenu
           sx={{ ml: 'auto', mr: '10px' }}
           options={[
-            { rangeTime: 3600 * 1000, label: '1 Hour' },
-            { rangeTime: 3600 * 1000 * 6, label: '6 Hours' },
+            { rangeTime: 3600 * 1000 * 3, label: '3 Hours' },
+            { rangeTime: 3600 * 1000 * 12, label: '12 Hours' },
             { rangeTime: DEFAULT_TIME, label: '24 Hours' },
             { rangeTime: 3600 * 1000 * 24 * 7, label: '7 Days' },
           ]}

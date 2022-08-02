@@ -8,6 +8,7 @@ export interface Transaction {
   ts: number;
   price: number;
   fee: number;
+  royalties: number;
 }
 
 export interface Transactions {

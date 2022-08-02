@@ -81,7 +81,8 @@ const getTransactions = async (count, startFromId = null) => {
         }
         realizedNFTPrice
         feeBuyer
-        feeSeller
+        feeBipsA
+        feeBipsB
         __typename
       }
       
@@ -94,6 +95,7 @@ const getTransactions = async (count, startFromId = null) => {
         nftID
         nftType
         token
+        creatorFeeBips
         __typename
       }
       `,

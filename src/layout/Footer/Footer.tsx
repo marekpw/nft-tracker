@@ -38,7 +38,7 @@ export const Footer = (props: Partial<ComponentProps<typeof Box>>) => {
           )}
         </Link>
 
-        <L2AddressLink sx={{ mr: '6px', ml: 'auto' }}>marekpw.loopring.eth</L2AddressLink>
+        <L2AddressLink color='text.secondary' sx={{ mr: '6px', ml: 'auto' }}>marekpw.loopring.eth</L2AddressLink>
         {heartIcon}
       </Box>
     </>

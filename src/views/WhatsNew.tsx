@@ -2,7 +2,7 @@ import { Box, Typography, Card, CardContent, CardHeader } from '@mui/material';
 import { format } from 'date-fns';
 import { ContentWrapper } from './ViewUtils/ContentWrapper';
 
-export const LATEST_VERSION = 'v1.0';
+export const LATEST_VERSION = 'v1.1';
 
 const UpdateSection = (props: React.PropsWithChildren<{ version: string, date: Date }>) => {
   const { version, date, children } = props;
@@ -29,6 +29,25 @@ export const WhatsNew = () => {
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
         <Typography variant='h4'>What's New</Typography>
       </Box>
+      <UpdateSection version='1.1' date={new Date('Aug 2 2022')}>
+        <Typography variant='subtitle1'>Fixed Volume/Fees Counting</Typography>
+        <Typography variant='body2'>
+          The volume summary used to include LRC trades as ETH which made the weekly volume statistics highly inaccurate. This has been fixed.
+          Additionally, fees, which previously included royalties as well, have been split into Network fees, Marketplace fees and Royalties.
+        </Typography>
+
+        <Typography variant='subtitle1' sx={{ mt: '16px' }}>More Data in Weekly Statistics</Typography>
+        <Typography variant='body2'>
+          Weekly Statistics now have more data, including the ratio of Gamestop trades to all trades on the network.
+          To identify which trades happened on the Gamestop Marketplace, the fee percentage is checked to be 2.25%. 
+        </Typography>
+
+        <Typography variant='subtitle1' sx={{ mt: '16px' }}>Trade Ranges, Update Interval</Typography>
+        <Typography variant='body2'>
+          Hourly trade ranges were not very useful and could easily include only a single data point.
+          Because of this, the 1hr/6hr trade ranges have been changed to 3hr and 12hr respectively. The update interval has also been changed to 10 minutes to catch new trades sooner.
+        </Typography>
+      </UpdateSection>
       <UpdateSection version='1.0' date={new Date('Jul 30 2022')}>
         <Typography variant='subtitle1'>Weekly Statistics</Typography>
         <Typography variant='body2'>

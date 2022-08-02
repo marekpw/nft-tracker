@@ -7,6 +7,7 @@ const groupBy = require('lodash.groupby');
 const { getNftMetadata } = require('./nftMetadata');
 const { getFile, updateMultipleFiles } = require('./githubApi');
 const { getTransactions } = require('./theGraphApi');
+const { convertToEth } = require('./exchangeRate');
 
 const WEEK_THRESHOLD = Date.now() - 3600 * 24 * 7 * 1000;
 const DAY_THRESHOLD = Date.now() - 3600 * 24 * 1000;
@@ -19,11 +20,28 @@ const FILENAMES = {
   metadata: 'src/data/metadata.json',
 };
 
+const decimals = (number, decPoints = 8) => {
+  return parseFloat(number.toFixed(decPoints));
+}
+
 // only displayed in the "Transactions" table
 const LAST_TRANSACTIONS_LIMIT = 1000;
 
-const parseTransaction = input => {
+const parseTransaction = async input => {
+  const symbol = input.token.symbol.toUpperCase();
   const priceCoeff = Math.pow(10, input.token.decimals);
+
+  const priceTargetCurrency = parseInt(input.realizedNFTPrice) / priceCoeff;
+  const networkFeeTargetCurrency = parseInt(input.feeBuyer) / priceCoeff;
+
+  const price = symbol === 'ETH' ? priceTargetCurrency : await convertToEth(priceTargetCurrency, symbol);
+  const networkFee = symbol === 'ETH' ? networkFeeTargetCurrency : await convertToEth(networkFeeTargetCurrency, symbol);
+  const royaltiesPercentage = input.nfts[0].creatorFeeBips;
+  const royalties = price * royaltiesPercentage / 100;
+  const sellerFeeTotal = input.feeBipsB / 100;
+  const marketplaceFeePercentage = sellerFeeTotal - royaltiesPercentage;
+  const marketplaceFee = price * marketplaceFeePercentage / 100;
+
   return {
     id: input.id,
     iid: input.internalID,
@@ -32,36 +50,43 @@ const parseTransaction = input => {
     buyer: input.accountBuyer.address,
     seller: input.accountSeller.address,
     ts: input.block.timestamp * 1000, // multiply by 1000 to work with JS millisecond timestamps
-    price: parseInt(input.realizedNFTPrice) / priceCoeff,
-    symbol: input.token.symbol,
-    fee: (parseInt(input.feeBuyer) / priceCoeff) + (parseInt(input.feeSeller) / priceCoeff),
     token: input.nfts[0].token,
-    
+    networkFee: decimals(networkFee),
+    royalties: decimals(royalties),
+    price: decimals(price),
+    marketplaceFee: decimals(marketplaceFee),
+    isGamestop: marketplaceFeePercentage.toFixed(2) === '2.25',
   };
 };
 
 const bucketMerger = (current, old) => {
   const sum = current.reduce((a, b) => a + b.price, 0);
-  const fees = current.reduce((a, b) => a + b.fee, 0);
+  const networkFeeSum = current.reduce((a, b) => a + b.networkFee, 0);
+  const marketplaceFeeSum = current.reduce((a, b) => a + b.marketplaceFee, 0);
+  const royaltiesSum = current.reduce((a, b) => a + b.royalties, 0);
+  const gamestopTrades = current.reduce((a, b) => a + (b.isGamestop ? 1 : 0), 0);
   const newData = [
     current.length,
     sum / current.length,
     sum,
-    fees,
+    networkFeeSum,
+    marketplaceFeeSum,
+    royaltiesSum,
+    gamestopTrades
   ];
 
   if (!old) {
     return newData;
   }
 
-  const [oldTrades, _, oldSum, oldFees] = old;
-  const [newTrades, __, newSum, newFees] = newData;
-
   return [
-    oldTrades + newTrades,
-    oldSum / oldTrades + newSum / newTrades,
-    oldSum + newSum,
-    oldFees + newFees,
+    old[0] + newData[0],                        // trades
+    old[2] / old[0] + newData[2] / newData[0],  // average price
+    old[2] + newData[2],                        // sum
+    old[3] + newData[3],                        // network fees sum
+    old[4] + newData[4],                        // marketplace fees sum
+    old[5] + newData[5],                        // royalties sum
+    old[6] + newData[6],                        // Gamestop trades 
   ];
 };
 
@@ -169,9 +194,9 @@ exports.handler = async () => {
   ]);
 
   let lastTransactions = JSON.parse(lastTransactionsFile.content);
-  let weekly = JSON.parse(weeklyFile.content);
-  let daily = JSON.parse(dailyFile.content);
-  let nfts = JSON.parse(nftsFile.content);
+  const weekly = JSON.parse(weeklyFile.content);
+  const daily = JSON.parse(dailyFile.content);
+  const nfts = JSON.parse(nftsFile.content);
 
   const lastRecordedTransactionId = weekly.lastTransaction;
 
@@ -186,7 +211,7 @@ exports.handler = async () => {
 
     let foundExit = false;
     for (const transaction of trx) {
-      const parsed = parseTransaction(transaction);
+      const parsed = await parseTransaction(transaction);
 
       if (parsed.iid === lastRecordedTransactionId) {
         // found the previous exit point - break and stop querying graph
@@ -204,8 +229,8 @@ exports.handler = async () => {
 
       if (!lastTransactions.find(t => t.iid === parsed.iid)) {
         // The client doesn't need everything. Only pass what's needed to save bandwidth.
-        const { iid, id, nftId, buyer, seller, ts, price, fee } = parsed;
-        lastTransactions.push({ iid, id, nftId, buyer, seller, ts, price, fee });
+        const { iid, id, nftId, buyer, seller, ts, price, marketplaceFee, networkFee, royalties } = parsed;
+        lastTransactions.push({ iid, id, nftId, buyer, seller, ts, price, royalties, fee: marketplaceFee + networkFee });
       }
 
       if (!nfts.hasOwnProperty(parsed.nftId)) {
@@ -299,13 +324,14 @@ exports.handler = async () => {
       return true;
     }
 
-    const buckets = weeklyNftBuckets[key];
-    const trades = bucketValues(buckets).reduce((acc, current) => {
+    const weeklyBuckets = weeklyNftBuckets[key];
+    const weeklyTrades = bucketValues(weeklyBuckets).reduce((acc, current) => {
       // 0 is the trade count
       return acc + current[0];
     }, 0);
 
-    return trades >= 3;
+    // otherwise, at least 3 weekly trades per NFT get a pass
+    return weeklyTrades >= 3;
   });
 
   const newNfts = Object.keys(weekly.nfts);
@@ -365,3 +391,5 @@ exports.handler = async () => {
     console.error(`[CRITICAL] Failed to write to GitHub. Changes will not be reflected. Error: ${error}`);
   }
 };
+
+exports.handler();

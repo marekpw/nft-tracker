@@ -14,11 +14,18 @@ const octokit = new Octokit({
  * @returns {Promise<{ sha: string, content: string }>}
  */
 const getFile = async (filePath) => {
-  const { data: result } = await octokit.rest.repos.getContent({
-    owner: 'marekpw',
-    repo: 'nft-tracker',
-    path: filePath,
-  });
+  let result;
+  try {
+    const { data } = await octokit.rest.repos.getContent({
+      owner: 'marekpw',
+      repo: 'nft-tracker',
+      path: filePath,
+      ref: 'master',
+    });
+    result = data;
+  } catch (error) {
+    throw new Error(`failed to get contents of ${filePath}: ${error}`);
+  }
 
   if (result.content) {
     return {
