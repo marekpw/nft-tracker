@@ -8,18 +8,20 @@ const { getNftMetadata } = require('./nftMetadata');
 const { getFile, updateMultipleFiles } = require('./githubApi');
 const { getTransactions } = require('./theGraphApi');
 
-const MONTH_THRESHOLD = Date.now() - 3600 * 24 * 30 * 1000;
 const WEEK_THRESHOLD = Date.now() - 3600 * 24 * 7 * 1000;
 const DAY_THRESHOLD = Date.now() - 3600 * 24 * 1000;
 
 const FILENAMES = {
   transactions: 'src/data/transactions.json',
-  monthly: 'src/data/monthly.json',
   weekly: 'src/data/weekly.json',
   daily: 'src/data/daily.json',
   nfts: 'src/data/nfts.json',
   metadata: 'src/data/metadata.json',
 };
+
+const decimals = (number, decPoints = 8) => {
+  return parseFloat(number.toFixed(decPoints));
+}
 
 // only displayed in the "Transactions" table
 const LAST_TRANSACTIONS_LIMIT = 1000;
@@ -29,10 +31,10 @@ const parseTransaction = input => {
   const price = parseInt(input.realizedNFTPrice) / priceCoeff;
   const networkFee = parseInt(input.feeBuyer) / priceCoeff;
   const royaltiesPercentage = input.nfts[0].creatorFeeBips;
-  const royalties = royaltiesPercentage > 0 ? (price / royaltiesPercentage) : 0;
+  const royalties = price * royaltiesPercentage / 100;
   const sellerFeeTotal = input.feeBipsB / 100;
   const marketplaceFeePercentage = sellerFeeTotal - royaltiesPercentage;
-  const marketplaceFee = marketplaceFeePercentage > 0 ? (price / marketplaceFeePercentage) : 0;
+  const marketplaceFee = price * marketplaceFeePercentage / 100;
 
   return {
     id: input.id,
@@ -44,10 +46,10 @@ const parseTransaction = input => {
     ts: input.block.timestamp * 1000, // multiply by 1000 to work with JS millisecond timestamps
     symbol: input.token.symbol,
     token: input.nfts[0].token,
-    networkFee,
-    royalties,
-    price,
-    marketplaceFee,
+    networkFee: decimals(networkFee),
+    royalties: decimals(royalties),
+    price: decimals(price),
+    marketplaceFee: decimals(marketplaceFee),
     isGamestop: marketplaceFeePercentage.toFixed(2) === '2.25',
   };
 };
@@ -176,16 +178,14 @@ const resampleTransactions = (transactions, existingValues, options) => {
  * #########################
  */
 exports.handler = async () => {
-  const [lastTransactionsFile, monthlyFile, weeklyFile, dailyFile, nftsFile] = await Promise.all([
+  const [lastTransactionsFile, weeklyFile, dailyFile, nftsFile] = await Promise.all([
     getFile(FILENAMES.transactions),
-    getFile(FILENAMES.monthly),
     getFile(FILENAMES.weekly),
     getFile(FILENAMES.daily),
     getFile(FILENAMES.nfts),
   ]);
 
   let lastTransactions = JSON.parse(lastTransactionsFile.content);
-  const monthly = JSON.parse(monthlyFile.content);
   const weekly = JSON.parse(weeklyFile.content);
   const daily = JSON.parse(dailyFile.content);
   const nfts = JSON.parse(nftsFile.content);
@@ -286,18 +286,6 @@ exports.handler = async () => {
     idProperty: 'token'
   });
 
-  const { samples: monthlySamples, data: monthlyNftBuckets } = resampleTransactions(transactionsToResample, monthly.nfts, {
-    threshold: MONTH_THRESHOLD,
-    minutes: 60 * 6, // 6 hour intervals,
-    idProperty: 'nftId'
-  });
-
-  const { data: monthlyTokenBuckets } = resampleTransactions(transactionsToResample, monthly.tokens, {
-    threshold: MONTH_THRESHOLD,
-    minutes: 60 * 6, // 6 hour intervals,
-    idProperty: 'token'
-  });
-
   console.log(`[INFO] All transactions parsed.`);
 
   daily.labels = dailySamples;
@@ -309,11 +297,6 @@ exports.handler = async () => {
   weekly.nfts = weeklyNftBuckets;
   weekly.tokens = weeklyTokenBuckets;
   weekly.lastTransaction = transactionsToResample[0].iid;
-
-  monthly.labels = monthlySamples;
-  monthly.nfts = monthlyNftBuckets;
-  monthly.tokens = monthlyTokenBuckets;
-  monthly.lastTransaction = transactionsToResample[0].iid;
 
   let dailyVolume = 0;
   let dailyTrades = 0;
@@ -330,17 +313,6 @@ exports.handler = async () => {
   const weeklyPopularNfts = Object.keys(weeklyNftBuckets).filter(key => {
     if (lastTransactions.find(tx => tx.nftId === key)) {
       // we need all nfts for last transactions because they're displayed on the transactions page.
-      return true;
-    }
-
-    const monthlyBuckets = monthlyNftBuckets[key];
-    const monthlyTrades = bucketValues(monthlyBuckets).reduce((acc, current) => {
-      // 0 is the trade count
-      return acc + current[0];
-    }, 0);
-
-    if (monthlyTrades >= 10) {
-      // if there have been at least 10 trades for the NFT in the last month, keep it
       return true;
     }
 
@@ -396,7 +368,6 @@ exports.handler = async () => {
   try {
     await updateMultipleFiles({
       [FILENAMES.daily]: JSON.stringify(daily),
-      [FILENAMES.monthly]: JSON.stringify(monthly),
       [FILENAMES.weekly]: JSON.stringify(weekly),
       [FILENAMES.transactions]: JSON.stringify(lastTransactions),
       [FILENAMES.nfts]: JSON.stringify(nfts),
@@ -412,3 +383,5 @@ exports.handler = async () => {
     console.error(`[CRITICAL] Failed to write to GitHub. Changes will not be reflected. Error: ${error}`);
   }
 };
+
+exports.handler();
