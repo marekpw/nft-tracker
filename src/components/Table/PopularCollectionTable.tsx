@@ -32,6 +32,11 @@ export const PopularCollectionTable = (props: PopularCollectionTableProps) => {
   const { state, trades } = useTradeInfo(lowerBoundTimestamp < Date.now() - 86400 * 1000 ? 'weekly' : 'daily');
 
   const chartLabels = trades.labels.filter(bucketTime => bucketTime > lowerBoundTimestamp);
+  const datasetLabels: Record<TradingChartProps['dataset'], string> = {
+    avgPrice: 'Average Price',
+    trades: 'Trades',
+    volume: 'Volume'
+  };
 
   const tokens = useMemo(() => {
     return Object.keys(trades.tokens)
@@ -122,7 +127,7 @@ export const PopularCollectionTable = (props: PopularCollectionTableProps) => {
     },
     {
       field: 'chart',
-      headerName: '',
+      headerName: datasetLabels[chartDataset],
       sortable: false,
       minWidth: 250,
       maxWidth: 500,

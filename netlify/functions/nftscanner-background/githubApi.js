@@ -20,7 +20,7 @@ const getFile = async (filePath) => {
       owner: 'marekpw',
       repo: 'nft-tracker',
       path: filePath,
-      ref: 'develop',
+      ref: 'master',
     });
     result = data;
   } catch (error) {
@@ -55,7 +55,7 @@ const updateMultipleFiles = async files => {
   return await octokit.rest.repos.createOrUpdateFiles({
     owner: 'marekpw',
     repo: 'nft-tracker',
-    branch: 'develop',
+    branch: 'master',
     changes: [
       {
         message: 'netlify bot: update files',

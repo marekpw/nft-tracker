@@ -1,8 +1,9 @@
 import React from 'react';
 import { GridColDef } from '@mui/x-data-grid';
-import { Link } from '@mui/material';
+import { Link, Tooltip } from '@mui/material';
 import { useLocalStorage } from '@rehooks/local-storage';
 import { formatDistanceStrict } from 'date-fns';
+import InfoIcon from '@mui/icons-material/InfoOutlined';
 
 import { StyledGrid } from './StyledGrid';
 import { NftIllustration } from '../Nft/NftIllustration';
@@ -75,8 +76,21 @@ export const TransactionTable = (props: TransactionTableProps) => {
       renderCell: params => <DualPrice ethPrice={params.value} />
     },
     {
+      field: 'royalties',
+      headerName: 'Royalties',
+      minWidth: 150,
+      renderCell: params => <DualPrice ethPrice={params.value} />
+    },
+    {
       field: 'fee',
-      headerName: 'Fees',
+      renderHeader: () => (
+        <>
+          Fee
+          <Tooltip sx={{ ml: '2px' }} title='Loopring Network Fees + Marketplace Fees'>
+            <InfoIcon />
+          </Tooltip>
+        </>
+      ),
       minWidth: 150,
       renderCell: params => <DualPrice ethPrice={params.value} />
     },
@@ -91,6 +105,7 @@ export const TransactionTable = (props: TransactionTableProps) => {
       seller: tx.seller,
       buyer: tx.buyer,
       price: tx.price,
+      royalties: tx.royalties,
       fee: tx.fee,
     }));
 

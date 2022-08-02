@@ -2,10 +2,4 @@
   package = "@netlify/plugin-functions-install-core"
 
 [functions."nftscanner-background"]
-  schedule = "*/20 * * * *"
-
-[[headers]]
-  for = "data/*.json"
-  [headers.values]
-    Cache-Control = "public, max-age=1800"
-
+  schedule = "*/10 * * * *"
