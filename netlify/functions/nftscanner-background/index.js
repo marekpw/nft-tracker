@@ -7,6 +7,7 @@ const groupBy = require('lodash.groupby');
 const { getNftMetadata } = require('./nftMetadata');
 const { getFile, updateMultipleFiles } = require('./githubApi');
 const { getTransactions } = require('./theGraphApi');
+const { convertToEth } = require('./exchangeRate');
 
 const WEEK_THRESHOLD = Date.now() - 3600 * 24 * 7 * 1000;
 const DAY_THRESHOLD = Date.now() - 3600 * 24 * 1000;
@@ -26,10 +27,15 @@ const decimals = (number, decPoints = 8) => {
 // only displayed in the "Transactions" table
 const LAST_TRANSACTIONS_LIMIT = 1000;
 
-const parseTransaction = input => {
+const parseTransaction = async input => {
+  const symbol = input.token.symbol.toUpperCase();
   const priceCoeff = Math.pow(10, input.token.decimals);
-  const price = parseInt(input.realizedNFTPrice) / priceCoeff;
-  const networkFee = parseInt(input.feeBuyer) / priceCoeff;
+
+  const priceTargetCurrency = parseInt(input.realizedNFTPrice) / priceCoeff;
+  const networkFeeTargetCurrency = parseInt(input.feeBuyer) / priceCoeff;
+
+  const price = symbol === 'ETH' ? priceTargetCurrency : await convertToEth(priceTargetCurrency, symbol);
+  const networkFee = symbol === 'ETH' ? networkFeeTargetCurrency : await convertToEth(networkFeeTargetCurrency, symbol);
   const royaltiesPercentage = input.nfts[0].creatorFeeBips;
   const royalties = price * royaltiesPercentage / 100;
   const sellerFeeTotal = input.feeBipsB / 100;
@@ -44,7 +50,6 @@ const parseTransaction = input => {
     buyer: input.accountBuyer.address,
     seller: input.accountSeller.address,
     ts: input.block.timestamp * 1000, // multiply by 1000 to work with JS millisecond timestamps
-    symbol: input.token.symbol,
     token: input.nfts[0].token,
     networkFee: decimals(networkFee),
     royalties: decimals(royalties),
@@ -203,7 +208,7 @@ exports.handler = async () => {
 
     let foundExit = false;
     for (const transaction of trx) {
-      const parsed = parseTransaction(transaction);
+      const parsed = await parseTransaction(transaction);
 
       if (parsed.iid === lastRecordedTransactionId) {
         // found the previous exit point - break and stop querying graph
