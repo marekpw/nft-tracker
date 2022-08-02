@@ -64,13 +64,15 @@ const bucketMerger = (current, old) => {
   const networkFeeSum = current.reduce((a, b) => a + b.networkFee, 0);
   const marketplaceFeeSum = current.reduce((a, b) => a + b.marketplaceFee, 0);
   const royaltiesSum = current.reduce((a, b) => a + b.royalties, 0);
+  const gamestopTrades = current.reduce((a, b) => a + (b.isGamestop ? 1 : 0), 0);
   const newData = [
     current.length,
     sum / current.length,
     sum,
     networkFeeSum,
     marketplaceFeeSum,
-    royaltiesSum
+    royaltiesSum,
+    gamestopTrades
   ];
 
   if (!old) {
@@ -84,6 +86,7 @@ const bucketMerger = (current, old) => {
     old[3] + newData[3],                        // network fees sum
     old[4] + newData[4],                        // marketplace fees sum
     old[5] + newData[5],                        // royalties sum
+    old[6] + newData[6],                        // Gamestop trades 
   ];
 };
 

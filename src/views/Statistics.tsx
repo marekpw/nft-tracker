@@ -62,20 +62,19 @@ export const Statistics = () => {
     return days.find(day => parseInt(timestamp) > day);
   });
 
-  const totalVolume = flattened.reduce((accumulator, point) => {
+  const sums = flattened.reduce((accumulator, point) => {
     const [, values] = point;
-    return accumulator + values[2];
-  }, 0);
+    return accumulator.map((prevValue, index) => prevValue + values[index]);
+  }, [0, 0, 0, 0, 0, 0, 0]);
 
-  const totalTrades = flattened.reduce((accumulator, point) => {
-    const [, values] = point;
-    return accumulator + values[0];
-  }, 0);
+  const totalTrades = sums[0];
+  const totalVolume = sums[2];
+  const totalNetworkFees = sums[3];
+  const totalMarketplaceFees = sums[4];
+  const totalRoyalties = sums[5];
+  const gamestopTrades = sums[6];
 
-  const totalFees = flattened.reduce((accumulator, point) => {
-    const [, values] = point;
-    return accumulator + values[3];
-  }, 0);
+  const gamestopRatio = Math.round(gamestopTrades / totalTrades * 100);
 
   // Lodash places the remaining items under the "undefined" umbrella. These are trades that happened on the first day of the weekly data which we don't show as it is incomplete.
   delete grouped['undefined'];
@@ -83,13 +82,13 @@ export const Statistics = () => {
   const mapped = transform(grouped, (result, points, key) => {
     result[key] = points.reduce((acc, point) => {
       const [, values] = point;
-      return [
-        acc[0] + values[0], // trades
-        acc[1] + values[2], // volume
-        acc[2] + values[3]  // fees
-      ]
-    }, [0, 0, 0])
-  }, {} as { [key: string]: [number, number, number] });
+      const sums = acc.map((prevValue, index) => prevValue + values[index]);
+
+      // remove Gamestop trades from the trades because we will be displaying those two in a stacked bar chart.
+      sums[0] = sums[6] - sums[0];
+      return sums;
+    }, [0, 0, 0, 0, 0, 0, 0]);
+  }, {} as { [key: string]: [number, number, number, number, number, number, number] });
 
   return (
     <ContentWrapper scrollable>
@@ -97,34 +96,49 @@ export const Statistics = () => {
         <Typography variant='h4'>Weekly Statistics</Typography>
       </Box>
       <Grid container spacing={4}>
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} sm={6} md={4} xl={2}>
           <StatisticsCard variant='outlined' title='Weekly Volume' floatingEthSymbol sx={{ textAlign: 'center' }}>
             <DualPrice ethPrice={totalVolume} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
           </StatisticsCard>
         </Grid>
-        <Grid item xs={12} md={4}>
-          <StatisticsCard variant='outlined' title='Fees Collected' floatingEthSymbol sx={{ textAlign: 'center' }}>
-            <DualPrice ethPrice={totalFees} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
+        <Grid item xs={12} sm={6} md={4} xl={2}>
+          <StatisticsCard variant='outlined' title='Weekly Trades' sx={{ textAlign: 'center' }}>
+            <Typography variant='h2'>{totalTrades}</Typography>
           </StatisticsCard>
         </Grid>
-        <Grid item xs={12} md={4}>
-          <StatisticsCard variant='outlined' title='Weekly Trades' sx={{ textAlign: 'center' }}>
-            <Typography variant='h3'>{totalTrades}</Typography>
+        <Grid item xs={12} sm={6} md={4} xl={2}>
+          <StatisticsCard variant='outlined' title='Gamestop Trade Ratio' sx={{ textAlign: 'center' }}>
+            <Typography variant='h2'>{gamestopRatio}%</Typography>
+          </StatisticsCard>
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} xl={2}>
+          <StatisticsCard variant='outlined' title='Fees Collected (Loopring)' floatingEthSymbol sx={{ textAlign: 'center' }}>
+            <DualPrice ethPrice={totalNetworkFees} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
+          </StatisticsCard>
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} xl={2}>
+          <StatisticsCard variant='outlined' title='Fees Collected (Marketplace)' floatingEthSymbol sx={{ textAlign: 'center' }}>
+            <DualPrice ethPrice={totalMarketplaceFees} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
+          </StatisticsCard>
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} xl={2}>
+          <StatisticsCard variant='outlined' title='Royalties Paid Out' floatingEthSymbol sx={{ textAlign: 'center' }}>
+            <DualPrice ethPrice={totalRoyalties} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
           </StatisticsCard>
         </Grid>
         <Grid item xs={12} xl={4}>
           <StatisticsCard title='Daily Volume'>
-            <WeeklyStatisticsChart height={300} points={mapped} dataset={1} label='Volume' color={theme.palette.success.light} />
+            <WeeklyStatisticsChart height={300} points={mapped} dataset={2} label='Volume' color={theme.palette.success.light} />
           </StatisticsCard>
         </Grid>
         <Grid item xs={12} xl={4}>
           <StatisticsCard title='Daily Fees Collected'>
-            <WeeklyStatisticsChart height={300} points={mapped} dataset={2} label='Fees' color={theme.palette.warning.light} />
+            <WeeklyStatisticsChart height={300} points={mapped} dataset={[3, 4, 5]} label={['Network', 'Marketplace', 'Royalties']} color={[theme.palette.warning.light, theme.palette.success.light, theme.palette.error.light]} />
           </StatisticsCard>
         </Grid>
         <Grid item xs={12} xl={4}>
           <StatisticsCard title='Daily Trades'>
-            <WeeklyStatisticsChart height={300} points={mapped} dataset={0} label='Trades' color={theme.palette.primary.light} />
+            <WeeklyStatisticsChart height={300} points={mapped} dataset={[0, 6]} label={['Other Marketplaces', 'Gamestop Marketplace']} color={[theme.palette.primary.main, theme.palette.primary.light]} />
           </StatisticsCard>
         </Grid>
       </Grid>
