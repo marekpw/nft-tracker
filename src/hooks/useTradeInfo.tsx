@@ -5,9 +5,10 @@ export type TradeRange = 'daily' | 'weekly';
 /**
  * Trade buckets information to display in a chart.
  * The key is the timestamp of the bucket (converted to string)
- * The value is an array of numbers for the bucket - [trades, avgPrice, sum, feesSum]
+ * The value is an array of numbers for the bucket:
+ * [trades, avgPrice, sum, networkFees, marketplaceFees, royalties, gamestopTrades]
  */
-export type TradeBuckets = { [key: string]: [number, number, number, number] };
+export type TradeBuckets = { [key: string]: [number, number, number, number, number, number, number] };
 
 export interface TradeInfo {
   state: 'loading' | 'error' | 'ok';

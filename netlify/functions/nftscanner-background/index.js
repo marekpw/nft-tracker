@@ -229,8 +229,8 @@ exports.handler = async () => {
 
       if (!lastTransactions.find(t => t.iid === parsed.iid)) {
         // The client doesn't need everything. Only pass what's needed to save bandwidth.
-        const { iid, id, nftId, buyer, seller, ts, price, fee } = parsed;
-        lastTransactions.push({ iid, id, nftId, buyer, seller, ts, price, fee });
+        const { iid, id, nftId, buyer, seller, ts, price, marketplaceFee, networkFee, royalties } = parsed;
+        lastTransactions.push({ iid, id, nftId, buyer, seller, ts, price, royalties, fee: marketplaceFee + networkFee });
       }
 
       if (!nfts.hasOwnProperty(parsed.nftId)) {

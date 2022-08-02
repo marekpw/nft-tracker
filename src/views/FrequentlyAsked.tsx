@@ -32,7 +32,7 @@ export const FrequentlyAsked = () => {
         When you use LoopNFT, your browser makes a request to load this JSON file and displays the information in a user friendly way.
       </FaqSection>
       <FaqSection title='How often is data updated?'>
-        The NFT trade scanner runs once every 20 minutes and pulls in the latest transactions.
+        The NFT trade scanner runs once every 10 minutes and pulls in the latest transactions.
       </FaqSection>
       <FaqSection title='How much data is stored?'>
         Currently, transactions old up to 7 days are parsed and stored in a database.

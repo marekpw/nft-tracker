@@ -9,10 +9,22 @@ export interface WeeklyStatisticsChartProps extends Partial<Omit<ComponentProps<
   dataset: number | number[],
   label: string | string[],
   color: string | string[],
+  showFooter?: boolean;
+  tooltipColor: string;
+  formatTooltip?: (value: number) => string;
 }
 
 export const WeeklyStatisticsChart = (props: WeeklyStatisticsChartProps) => {
-  const { points, dataset, label, color, ...other } = props;
+  const {
+    points,
+    dataset,
+    label,
+    color,
+    showFooter = true,
+    tooltipColor,
+    formatTooltip = value => value.toString(),
+    ...other
+  } = props;
   
   const datasets = (Array.isArray(dataset) ? dataset : [dataset]).map((dataset, index) => {
     const data = Object.entries(points).map(([ timestamp, value ]) => ({
@@ -26,6 +38,8 @@ export const WeeklyStatisticsChart = (props: WeeklyStatisticsChartProps) => {
     return { data, label: setLabel, backgroundColor: setColor };
   });
 
+  const tooltipConfig = tooltipOptions(tooltipColor, value => formatTooltip(value));
+
   return (
     <Bar
       options={{
@@ -35,7 +49,15 @@ export const WeeklyStatisticsChart = (props: WeeklyStatisticsChartProps) => {
           legend: {
             display: Array.isArray(label)
           },
-          tooltip: tooltipOptions('red', value => dataset === 0 ? `${value} Trades` : `${parseFloat(value.toFixed(1))} ETH`),
+          tooltip: {
+            ...tooltipConfig,
+            callbacks: {
+              ...tooltipConfig.callbacks,
+              footer: tooltipItem => {
+                return (showFooter && tooltipItem?.[0]?.dataset.label?.toUpperCase()) || '';
+              }
+            }
+          }
         },
         scales: {
           x: {

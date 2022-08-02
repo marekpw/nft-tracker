@@ -9,9 +9,9 @@ import { TableOptionsMenu, ChartDataset } from '../components/Table/TableOptions
 export const DEFAULT_TIME = 3600 * 1000 * 24;
 
 export const PopularNfts = () => {
-  const [dataset, setDataset] = useLocalStorage<ChartDataset>('popular_nft_dataset', 'volume');
+  const [dataset, setDataset] = useLocalStorage<ChartDataset>('popular_nft_dataset_v1.1', 'avgPrice');
   const [minTrades, setMinTrades] = useLocalStorage<number>('popular_nft_mintrades', 3);
-  const [timeRange, setTimeRange] = useLocalStorage('popular_nft_timerange', DEFAULT_TIME);
+  const [timeRange, setTimeRange] = useLocalStorage('popular_nft_timerange_v1.1', DEFAULT_TIME);
   return (
     <ContentWrapper column>
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -20,8 +20,8 @@ export const PopularNfts = () => {
         <TimeFilterMenu 
           sx={{ ml: 'auto', mr: '10px' }}
           options={[
-            { rangeTime: 3600 * 1000, label: '1 Hour' },
-            { rangeTime: 3600 * 1000 * 6, label: '6 Hours' },
+            { rangeTime: 3600 * 1000 * 3, label: '3 Hours' },
+            { rangeTime: 3600 * 1000 * 12, label: '12 Hours' },
             { rangeTime: DEFAULT_TIME, label: '24 Hours' },
             { rangeTime: 3600 * 1000 * 24 * 7, label: '7 Days' },
           ]}

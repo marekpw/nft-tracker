@@ -1,5 +1,6 @@
 import { ComponentProps } from 'react';
 import { Box, Typography, Card, CardContent, CardHeader, Grid, useTheme } from '@mui/material';
+import { darken } from '@mui/material/styles';
 import { getTime, eachDayOfInterval, addDays } from 'date-fns';
 import groupBy from 'lodash.groupby';
 import flatMap from 'lodash.flatmap';
@@ -19,7 +20,7 @@ const StatisticsCard = (props: StatisticsCardProps) => {
   const { title, floatingEthSymbol = false, children, ...other } = props;
 
   return (
-    <Card {...other} sx={{ height: '100%', ...other.sx }}>
+    <Card {...other} sx={{ height: '100%', p: '12px 24px', ...other.sx }}>
       <CardHeader title={title} />
       <CardContent sx={{ position: 'relative' }}>
         {children}
@@ -62,19 +63,26 @@ export const Statistics = () => {
     return days.find(day => parseInt(timestamp) > day);
   });
 
-  const sums = flattened.reduce((accumulator, point) => {
+  const sumOf = flattened.reduce((acc, point) => {
     const [, values] = point;
-    return accumulator.map((prevValue, index) => prevValue + values[index]);
-  }, [0, 0, 0, 0, 0, 0, 0]);
+    return {
+      trades: acc.trades + values[0],
+      volume: acc.volume + values[2],
+      networkFees: acc.networkFees + values[3],
+      marketplaceFees: acc.marketplaceFees + values[4],
+      royalties: acc.royalties + values[5],
+      gamestopTrades: acc.gamestopTrades + values[6],
+    };
+  }, {
+    trades: 0,
+    volume: 0,
+    networkFees: 0,
+    marketplaceFees: 0,
+    royalties: 0,
+    gamestopTrades: 0,
+  });
 
-  const totalTrades = sums[0];
-  const totalVolume = sums[2];
-  const totalNetworkFees = sums[3];
-  const totalMarketplaceFees = sums[4];
-  const totalRoyalties = sums[5];
-  const gamestopTrades = sums[6];
-
-  const gamestopRatio = Math.round(gamestopTrades / totalTrades * 100);
+  const gamestopRatio = Math.round(sumOf.gamestopTrades / sumOf.trades * 100);
 
   // Lodash places the remaining items under the "undefined" umbrella. These are trades that happened on the first day of the weekly data which we don't show as it is incomplete.
   delete grouped['undefined'];
@@ -86,7 +94,9 @@ export const Statistics = () => {
 
       // remove Gamestop trades from the trades because we will be displaying those two in a stacked bar chart.
       sums[0] = sums[6] - sums[0];
-      return sums;
+
+      // Typescript doesn't properly infer the type for acc.map
+      return sums as typeof values;
     }, [0, 0, 0, 0, 0, 0, 0]);
   }, {} as { [key: string]: [number, number, number, number, number, number, number] });
 
@@ -98,12 +108,12 @@ export const Statistics = () => {
       <Grid container spacing={4}>
         <Grid item xs={12} sm={6} md={4} xl={2}>
           <StatisticsCard variant='outlined' title='Weekly Volume' floatingEthSymbol sx={{ textAlign: 'center' }}>
-            <DualPrice ethPrice={totalVolume} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
+            <DualPrice ethPrice={sumOf.volume} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
           </StatisticsCard>
         </Grid>
         <Grid item xs={12} sm={6} md={4} xl={2}>
           <StatisticsCard variant='outlined' title='Weekly Trades' sx={{ textAlign: 'center' }}>
-            <Typography variant='h2'>{totalTrades}</Typography>
+            <Typography variant='h2'>{sumOf.trades}</Typography>
           </StatisticsCard>
         </Grid>
         <Grid item xs={12} sm={6} md={4} xl={2}>
@@ -113,32 +123,64 @@ export const Statistics = () => {
         </Grid>
         <Grid item xs={12} sm={6} md={4} xl={2}>
           <StatisticsCard variant='outlined' title='Fees Collected (Loopring)' floatingEthSymbol sx={{ textAlign: 'center' }}>
-            <DualPrice ethPrice={totalNetworkFees} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
+            <DualPrice ethPrice={sumOf.networkFees} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
           </StatisticsCard>
         </Grid>
         <Grid item xs={12} sm={6} md={4} xl={2}>
           <StatisticsCard variant='outlined' title='Fees Collected (Marketplace)' floatingEthSymbol sx={{ textAlign: 'center' }}>
-            <DualPrice ethPrice={totalMarketplaceFees} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
+            <DualPrice ethPrice={sumOf.marketplaceFees} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
           </StatisticsCard>
         </Grid>
         <Grid item xs={12} sm={6} md={4} xl={2}>
           <StatisticsCard variant='outlined' title='Royalties Paid Out' floatingEthSymbol sx={{ textAlign: 'center' }}>
-            <DualPrice ethPrice={totalRoyalties} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
+            <DualPrice ethPrice={sumOf.royalties} ethDecimal={1} showEthIcon={false} ethPriceProps={{ variant: 'h3' }} usdPriceProps={{ variant: 'subtitle1' }} />
           </StatisticsCard>
         </Grid>
         <Grid item xs={12} xl={4}>
           <StatisticsCard title='Daily Volume'>
-            <WeeklyStatisticsChart height={300} points={mapped} dataset={2} label='Volume' color={theme.palette.success.light} />
+            <WeeklyStatisticsChart
+              height={300}
+              points={mapped}
+              dataset={2}
+              label='Volume'
+              formatTooltip={value => parseFloat(value.toFixed(1)) + ' ETH'}
+              tooltipColor={theme.palette.success.light}
+              color={theme.palette.success.light}
+            />
           </StatisticsCard>
         </Grid>
         <Grid item xs={12} xl={4}>
           <StatisticsCard title='Daily Fees Collected'>
-            <WeeklyStatisticsChart height={300} points={mapped} dataset={[3, 4, 5]} label={['Network', 'Marketplace', 'Royalties']} color={[theme.palette.warning.light, theme.palette.success.light, theme.palette.error.light]} />
+
+            <WeeklyStatisticsChart
+              height={300}
+              points={mapped}
+              dataset={[3, 4, 5]}
+              label={['Network', 'Marketplace', 'Royalties']}
+              formatTooltip={value => parseFloat(value.toFixed(1)) + ' ETH'}
+              tooltipColor={theme.palette.warning.light}
+              color={[
+                darken(theme.palette.warning.light, 0.5),
+                darken(theme.palette.warning.light, 0.25),
+                theme.palette.warning.light,
+              ]}
+            />
           </StatisticsCard>
         </Grid>
         <Grid item xs={12} xl={4}>
           <StatisticsCard title='Daily Trades'>
-            <WeeklyStatisticsChart height={300} points={mapped} dataset={[0, 6]} label={['Other Marketplaces', 'Gamestop Marketplace']} color={[theme.palette.primary.main, theme.palette.primary.light]} />
+            <WeeklyStatisticsChart
+              height={300}
+              points={mapped}
+              dataset={[0, 6]}
+              label={['Other', 'Gamestop Marketplace']}
+              formatTooltip={value => value + ' Trades'}
+              tooltipColor={theme.palette.primary.light}
+              color={[
+                darken(theme.palette.primary.light, 0.5),
+                theme.palette.primary.light,
+              ]}
+            />
           </StatisticsCard>
         </Grid>
       </Grid>
