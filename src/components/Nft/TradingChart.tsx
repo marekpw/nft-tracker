@@ -23,12 +23,26 @@ export const TradingChart = (props: TradingChartProps) => {
   };
 
   const theme = useTheme();
+
+  let noTradesCount = 0;
+  const maxConsecutiveZeroTrades = Math.floor(labels.length) / 10;
   const data = labels.map((label, index) => {
-    const defaultValue = index === 0 ? 0 : null;
-    const value = buckets[label]?.[bucketIndex[dataset]] ?? defaultValue;
+    const value = buckets[label]?.[bucketIndex[dataset]];
+
+    if (!value) {
+      noTradesCount++;
+    } else {
+      noTradesCount = 0;
+    }
+
+    // a little helper to spanGaps - if there have been no trades for at least X consecutive points
+    // or since the beginning of the chart, display 0 instead of null so spanGaps doesn't make a super
+    // long connection between the first null point and the first actual trade. Useful mainly for new NFTs.
+    let defaultValue = (noTradesCount > maxConsecutiveZeroTrades || noTradesCount === index + 1) ? 0 : null;
+
     return {
       x: label,
-      y: value,
+      y: value ?? defaultValue,
     };
   });
   const datasetOptions: Record<typeof dataset, Partial<ChartDataset<'line'>>> = {
@@ -70,26 +84,22 @@ export const TradingChart = (props: TradingChartProps) => {
           legend: {
             display: false
           },
-          decimation: {
-            enabled: true,
-            algorithm: 'lttb',
-            samples: 10,
-          },
           tooltip: tooltipOptions(datasetOptions[dataset].borderColor as string, value => {
             return dataset === 'trades' ? `${value} Trades` : `${parseFloat(value.toFixed(4))} ETH`;
           }),
         },
         spanGaps: true,
+        tension: 0.1,
         scales: {
           x: {
             display: false,
             type: 'time',
             time: {
-              tooltipFormat: isBefore(labels[0], startOfYesterday()) ? 'E, MMM do \'at\' hh:ss a' : 'hh:ss a'
+              tooltipFormat: isBefore(labels[0], startOfYesterday()) ? 'E, MMM do \'at\' h a' : 'hh:mm a'
             }
           }
         } 
-      }}
+      } as any}
       data={{
         datasets: [
           {
