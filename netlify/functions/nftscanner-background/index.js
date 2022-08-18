@@ -211,6 +211,11 @@ exports.handler = async () => {
 
     let foundExit = false;
     for (const transaction of trx) {
+      if (!transaction.nfts?.length) {
+        console.log(`[WARN] Transaction ${transaction.id} has no NFTs associated with it. Skipping`);
+        continue;
+      }
+      
       const parsed = await parseTransaction(transaction);
 
       if (parsed.iid === lastRecordedTransactionId) {
